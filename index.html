@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>3D Moto Matrix - Multi-Mode Geometric Racing</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body { overflow: hidden; background: #05050f; color: #fff; }
+        #hud {
+            position: absolute; top: 20px; left: 20px; z-index: 10;
+            background: rgba(10, 15, 30, 0.75); padding: 15px 25px;
+            border-left: 4px solid #00ffcc; border-radius: 6px;
+            backdrop-filter: blur(5px);
+        }
+        #hud h1 { font-size: 18px; letter-spacing: 2px; color: #00ffcc; margin-bottom: 8px; }
+        .stat { font-size: 14px; margin: 4px 0; color: #cbd5e1; }
+        .stat span { font-weight: bold; color: #fff; font-size: 16px; }
+        #menu {
+            position: absolute; inset: 0; background: rgba(5, 5, 15, 0.9);
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            z-index: 20; gap: 15px;
+        }
+        #menu h2 { font-size: 36px; color: #00ffcc; text-transform: uppercase; letter-spacing: 4px; }
+        .controls-group { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+        select, button {
+            padding: 12px 20px; font-size: 15px; border-radius: 5px; border: 1px solid #00ffcc;
+            background: #0f172a; color: #fff; cursor: pointer; transition: 0.2s;
+        }
+        button:hover { background: #00ffcc; color: #05050f; font-weight: bold; }
+        #mobile-controls {
+            position: absolute; bottom: 20px; width: 100%; display: flex;
+            justify-content: space-between; padding: 0 30px; z-index: 15;
+        }
+        .touch-btn {
+            width: 65px; height: 65px; border-radius: 50%; background: rgba(0, 255, 204, 0.2);
+            border: 2px solid #00ffcc; color: #fff; font-size: 20px; display: flex;
+            align-items: center; justify-content: center; user-select: none;
+        }
+    </style>
+</head>
+<body>
+
+<div id="hud">
+    <h1 id="ui-title">MOTO MATRIX 3D</h1>
+    <div class="stat"><span id="lbl-speed">Speed</span>: <span id="speed-val">0</span> km/h</div>
+    <div class="stat"><span id="lbl-score">Score</span>: <span id="score-val">0</span></div>
+    <div class="stat"><span id="lbl-mode">Mode</span>: <span id="mode-val">Cyber Grid</span></div>
+</div>
+
+<div id="menu">
+    <h2>3D MOTO MATRIX</h2>
+    <div class="controls-group">
+        <select id="lang-select">
+            <option value="en">Language: English</option>
+            <option value="hi">भाषा: हिन्दी</option>
+            <option value="es">Idioma: Español</option>
+        </select>
+        <select id="bike-select">
+            <option value="cyber">Bike: Cyber Tron (Balanced)</option>
+            <option value="heavy">Bike: Titan Block (High Armor)</option>
+            <option value="hyper">Bike: Needle V8 (Max Speed)</option>
+        </select>
+        <select id="map-select">
+            <option value="grid">Map: Neon Geometry Grid</option>
+            <option value="desert">Map: Poly Desert Canyons</option>
+            <option value="void">Map: Quantum Space Void</option>
+        </select>
+        <select id="mode-select">
+            <option value="endless">Mode: Endless Rush</option>
+            <option value="time">Mode: Time Attack</option>
+        </select>
+    </div>
+    <button id="start-btn">START SIMULATION</button>
+</div>
+
+<div id="mobile-controls">
+    <div style="display:flex; gap:15px;">
+        <div class="touch-btn" id="btn-left">◀</div>
+        <div class="touch-btn" id="btn-right">▶</div>
+    </div>
+    <div style="display:flex; gap:15px;">
+        <div class="touch-btn" id="btn-brake">■</div>
+        <div class="touch-btn" id="btn-gas">▲</div>
+    </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+// ==================== 1. LOCALIZATION ENGINE ====================
+const I18N = {
+    en: { title: "MOTO MATRIX 3D", speed: "Speed", score: "Score", mode: "Mode", start: "START SIMULATION" },
+    hi: { title: "मोटो मैट्रिक्स 3D", speed: "रफ़्तार", score: "स्कोर", mode: "मोड", start: "गेम शुरू करें" },
+    es: { title: "MOTO MATRIZ 3D", speed: "Velocidad", score: "Puntuación", mode: "Modo", start: "INICIAR JUEGO" }
+};
+
+// ==================== 2. BIKE & MAP CONFIGURATIONS ====================
+const BIKES = {
+    cyber: { color: 0x00ffcc, maxSpeed: 2.2, accel: 0.03, handling: 0.18, scale: [0.8, 0.7, 2.2] },
+    heavy: { color: 0xffaa00, maxSpeed: 1.8, accel: 0.02, handling: 0.14, scale: [1.2, 0.9, 2.5] },
+    hyper: { color: 0xff0055, maxSpeed: 2.9, accel: 0.045, handling: 0.24, scale: [0.6, 0.6, 2.4] }
+};
+
+const MAPS = {
+    grid: { bg: 0x050510, fog: 0x050510, road: 0x111827, obsColor: 0xff0055, shape: 'box' },
+    desert: { bg: 0x2b1508, fog: 0x3d1e0d, road: 0x5c3a21, obsColor: 0xf59e0b, shape: 'cone' },
+    void: { bg: 0x000000, fog: 0x090d16, road: 0x0f172a, obsColor: 0x8b5cf6, shape: 'octahedron' }
+};
+
+// ==================== 3. CORE 3D ENGINE ====================
+let scene, camera, renderer, playerBike, roadGrid;
+let obstacles = [];
+let gameState = {
+    running: false, speed: 0, score: 0,
+    bikeType: 'cyber', mapType: 'grid', mode: 'endless',
+    keys: { left: false, right: false, up: false, down: false }
+};
+
+function initEngine() {
+    scene = new THREE.Scene();
+    camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 500);
+    camera.position.set(0, 4, 8);
+    camera.lookAt(0, 1, -10);
+
+    renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    document.body.appendChild(renderer.domElement);
+
+    const ambient = new THREE.AmbientLight(0xffffff, 0.6);
+    scene.add(ambient);
+
+    const dirLight = new THREE.DirectionalLight(0xffffff, 0.9);
+    dirLight.position.set(10, 20, 10);
+    scene.add(dirLight);
+
+    window.addEventListener('resize', () => {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+}
+
+function buildWorld() {
+    while(scene.children.length > 0){ scene.remove(scene.children[0]); }
+    obstacles = [];
+
+    const mapCfg = MAPS[gameState.mapType];
+    const bikeCfg = BIKES[gameState.bikeType];
+
+    scene.background = new THREE.Color(mapCfg.bg);
+    scene.fog = new THREE.FogExp2(mapCfg.fog, 0.015);
+
+    const ambient = new THREE.AmbientLight(0xffffff, 0.7);
+    const dirLight = new THREE.DirectionalLight(0xffffff, 1);
+    dirLight.position.set(5, 15, 10);
+    scene.add(ambient, dirLight);
+
+    // Road Plane
+    const roadGeo = new THREE.PlaneGeometry(24, 1000);
+    const roadMat = new THREE.MeshStandardMaterial({ color: mapCfg.road, roughness: 0.8 });
+    const road = new THREE.Mesh(roadGeo, roadMat);
+    road.rotation.x = -Math.PI / 2;
+    road.position.z = -450;
+    scene.add(road);
+
+    roadGrid = new THREE.GridHelper(1000, 100, 0x00ffcc, 0x1e293b);
+    roadGrid.position.y = 0.02;
+    roadGrid.position.z = -450;
+    scene.add(roadGrid);
+
+    // Geometric Player Bike Assembly
+    playerBike = new THREE.Group();
+    const chassisGeo = new THREE.BoxGeometry(...bikeCfg.scale);
+    const chassisMat = new THREE.MeshStandardMaterial({ color: bikeCfg.color, metalness: 0.6, roughness: 0.2 });
+    const chassis = new THREE.Mesh(chassisGeo, chassisMat);
+    chassis.position.y = 0.6;
+    playerBike.add(chassis);
+
+    const wheelGeo = new THREE.CylinderGeometry(0.45, 0.45, 0.3, 16);
+    const wheelMat = new THREE.MeshStandardMaterial({ color: 0x111111 });
+    const frontWheel = new THREE.Mesh(wheelGeo, wheelMat);
+    frontWheel.rotation.z = Math.PI / 2;
+    frontWheel.position.set(0, 0.45, -0.9);
+    const backWheel = frontWheel.clone();
+    backWheel.position.set(0, 0.45, 0.9);
+    playerBike.add(frontWheel, backWheel);
+
+    scene.add(playerBike);
+
+    // Spawn Initial Geometric Obstacles
+    for (let i = 0; i < 45; i++) {
+        spawnObstacle(-30 - i * 18);
+    }
+}
+
+function spawnObstacle(zPos) {
+    const mapCfg = MAPS[gameState.mapType];
+    let geo;
+    if (mapCfg.shape === 'cone') geo = new THREE.ConeGeometry(1.2, 2.8, 6);
+    else if (mapCfg.shape === 'octahedron') geo = new THREE.OctahedronGeometry(1.3);
+    else geo = new THREE.BoxGeometry(2, 2, 2);
+
+    const mat = new THREE.MeshStandardMaterial({ color: mapCfg.obsColor, roughness: 0.3 });
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.position.set((Math.random() - 0.5) * 19, 1.1, zPos);
+    scene.add(mesh);
+    obstacles.push(mesh);
+}
+
+function updatePhysics() {
+    if (!gameState.running) return;
+
+    const bikeCfg = BIKES[gameState.bikeType];
+
+    if (gameState.keys.up) gameState.speed = Math.min(gameState.speed + bikeCfg.accel, bikeCfg.maxSpeed);
+    else if (gameState.keys.down) gameState.speed = Math.max(gameState.speed - bikeCfg.accel * 1.5, 0);
+    else gameState.speed = Math.max(gameState.speed - 0.008, 0.4); // Auto cruise base
+
+    if (gameState.keys.left && playerBike.position.x > -10) {
+        playerBike.position.x -= bikeCfg.handling;
+        playerBike.rotation.z = 0.25;
+    } else if (gameState.keys.right && playerBike.position.x < 10) {
+        playerBike.position.x += bikeCfg.handling;
+        playerBike.rotation.z = -0.25;
+    } else {
+        playerBike.rotation.z *= 0.85;
+    }
+
+    roadGrid.position.z += gameState.speed;
+    if (roadGrid.position.z > -400) roadGrid.position.z = -450;
+
+    // Move Obstacles & Collision Check
+    const playerBox = new THREE.Box3().setFromObject(playerBike);
+    for (let obs of obstacles) {
+        obs.position.z += gameState.speed;
+        obs.rotation.y += 0.02;
+
+        if (obs.position.z > 12) {
+            obs.position.z = -780;
+            obs.position.x = (Math.random() - 0.5) * 19;
+            gameState.score += 10;
+        }
+
+        const obsBox = new THREE.Box3().setFromObject(obs);
+        if (playerBox.intersectsBox(obsBox)) {
+            gameState.running = false;
+            alert("CRASH! Final Score: " + gameState.score);
+            document.getElementById('menu').style.display = 'flex';
+            break;
+        }
+    }
+
+    // Camera smooth follow
+    camera.position.x += (playerBike.position.x * 0.6 - camera.position.x) * 0.1;
+
+    // HUD Update
+    document.getElementById('speed-val').innerText = Math.round(gameState.speed * 110);
+    document.getElementById('score-val').innerText = gameState.score;
+}
+
+function animate() {
+    requestAnimationFrame(animate);
+    updatePhysics();
+    renderer.render(scene, camera);
+}
+
+// ==================== 4. INPUT & UI BINDINGS ====================
+window.addEventListener('keydown', e => {
+    if (e.key === 'ArrowLeft' || e.key === 'a') gameState.keys.left = true;
+    if (e.key === 'ArrowRight' || e.key === 'd') gameState.keys.right = true;
+    if (e.key === 'ArrowUp' || e.key === 'w') gameState.keys.up = true;
+    if (e.key === 'ArrowDown' || e.key === 's') gameState.keys.down = true;
+});
+window.addEventListener('keyup', e => {
+    if (e.key === 'ArrowLeft' || e.key === 'a') gameState.keys.left = false;
+    if (e.key === 'ArrowRight' || e.key === 'd') gameState.keys.right = false;
+    if (e.key === 'ArrowUp' || e.key === 'w') gameState.keys.up = false;
+    if (e.key === 'ArrowDown' || e.key === 's') gameState.keys.down = false;
+});
+
+const bindTouch = (id, key) => {
+    const el = document.getElementById(id);
+    el.addEventListener('touchstart', (e) => { e.preventDefault(); gameState.keys[key] = true; });
+    el.addEventListener('touchend', (e) => { e.preventDefault(); gameState.keys[key] = false; });
+};
+bindTouch('btn-left', 'left');
+bindTouch('btn-right', 'right');
+bindTouch('btn-gas', 'up');
+bindTouch('btn-brake', 'down');
+
+document.getElementById('lang-select').addEventListener('change', (e) => {
+    const t = I18N[e.target.value];
+    document.getElementById('ui-title').innerText = t.title;
+    document.getElementById('lbl-speed').innerText = t.speed;
+    document.getElementById('lbl-score').innerText = t.score;
+    document.getElementById('lbl-mode').innerText = t.mode;
+    document.getElementById('start-btn').innerText = t.start;
+});
+
+document.getElementById('start-btn').addEventListener('click', () => {
+    gameState.bikeType = document.getElementById('bike-select').value;
+    gameState.mapType = document.getElementById('map-select').value;
+    gameState.mode = document.getElementById('mode-select').value;
+    gameState.score = 0;
+    gameState.speed = 0.6;
+    document.getElementById('mode-val').innerText = gameState.mode.toUpperCase();
+    document.getElementById('menu').style.display = 'none';
+    buildWorld();
+    gameState.running = true;
+});
+
+initEngine();
+animate();
+</script>
+</body>
+</html>
