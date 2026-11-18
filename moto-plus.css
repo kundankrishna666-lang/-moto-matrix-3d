@@ -1,0 +1,6 @@
+#pause-btn,#install-btn{position:absolute;z-index:12;padding:8px 14px;font-size:14px;border-radius:8px}
+#pause-btn{top:20px;right:20px}
+#install-btn{display:none;position:static}
+#btn-brake{border-color:#ff0055;background:rgba(255,0,85,.18);font-size:16px}
+#btn-brake:active{background:rgba(255,0,85,.55)}
+#pause-ov{position:absolute;inset:0;background:rgba(0,0,0,.7);display:none;align-items:center;justify-content:center;z-index:22;font-size:40px;color:#00ffcc;letter-spacing:6px}
