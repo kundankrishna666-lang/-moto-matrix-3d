@@ -1,2 +1,3 @@
-{"name":"Moto Matrix 3D","short_name":"MotoMatrix","start_url":"./","scope":"./","display":"fullscreen","orientation":"landscape","background_color":"#020205","theme_color":"#00ffcc",
+{"name":"Rider Legend 3D","short_name":"RiderLegend","start_url":"./","scope":"./","display":"fullscreen","orientation":"landscape","background_color":"#020205","theme_color":"#00ffcc",
 "icons":[{"src":"icon.svg","sizes":"any","type":"image/svg+xml","purpose":"any maskable"}]}
+
